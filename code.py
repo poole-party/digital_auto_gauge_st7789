@@ -6,7 +6,6 @@ import supervisor
 import vectorio
 from adafruit_bitmap_font import  bitmap_font
 from adafruit_display_text import label
-from adafruit_st7735r import ST7735R
 from adafruit_st7789 import ST7789
 from analogio import AnalogIn
 from fourwire import FourWire
@@ -47,10 +46,11 @@ tft_reset = board.GP9
 
 # init the measurement vars
 boost_raw = AnalogIn(board.A0)
+# Need to figure out a different way to do this. Engine will be running and pulling vacuum before this can run.
 boost_offset = getBoostOffset(boost_raw)
 boost_pressure = boost_raw.value / 1000 - boost_offset
-max_boost = 9
-max_vacuum = -10
+max_boost = 25
+max_vacuum = -15
 thermistor = AnalogIn(board.A2)
 oil_temp = getTempFromADC(thermistor.value)
 temp_samples_index = 0
@@ -67,13 +67,11 @@ screen = displayio.Group()
 bar_group = displayio.Group()
 gauge_group = displayio.Group()
 
-# -- ST7789 displays --
 while not spi.try_lock():
     pass
 
 spi.configure(baudrate=24000000) # Configure SPI for 24MHz
 spi.unlock()
-# -- end ST7789 specific --
 
 display_bus = FourWire(
     spi,
@@ -82,7 +80,6 @@ display_bus = FourWire(
     reset = tft_reset
 )
 
-# -- ST7735R or ST7789 --
 display = ST7789(
     display_bus,
     width = display_width,
@@ -95,12 +92,12 @@ color_bitmap = displayio.Bitmap(display_width, display_height, 1)
 # display.rotation = 180
 
 # common vars shared by both gauges
-saira = bitmap_font.load_font("fonts/saira-bold-italic-28pt.bdf")
-sairaSmall = bitmap_font.load_font("fonts/saira-semibold-10pt.bdf")
+saira = bitmap_font.load_font("fonts/saira-bold-italic-56pt.bdf")
+sairaSmall = bitmap_font.load_font("fonts/saira-semibold-20pt.bdf")
 label_color = 0xff0303
 labels_x_pos = 1
 units_x_pos = display_width - 7
-bar_height = 42
+bar_height = 70
 bar_palette = displayio.Palette(2)
 bar_palette[0] = 0x0000aa
 bar_palette[1] = 0xff0303
@@ -120,7 +117,7 @@ boost_units.anchored_position = (units_x_pos, boost_readout_y_pos)
 boost_bar = vectorio.Rectangle(
     pixel_shader = bar_palette,
     x = 0,
-    y = int(boost_readout_y_pos - 16 - bar_height / 2),
+    y = int(boost_readout_y_pos - 31 - bar_height / 2),
     width = 1,
     height = bar_height,
     color_index = 0,
@@ -128,7 +125,7 @@ boost_bar = vectorio.Rectangle(
 vacuum_bar = vectorio.Rectangle(
     pixel_shader = bar_palette,
     x = display_width - 1,
-    y = int(boost_readout_y_pos - 16 - bar_height / 2),
+    y = int(boost_readout_y_pos - 31 - bar_height / 2),
     width = 1,
     height = bar_height,
     color_index = 1
@@ -140,7 +137,7 @@ boost_readout = label.Label(
     color=0xffffff
 )
 boost_readout.anchor_point = (1.0, 1.0)
-boost_readout.anchored_position = (display_width - 32, boost_readout_y_pos - 3)
+boost_readout.anchored_position = (display_width - 42, boost_readout_y_pos - 3)
 
 bar_group.append(boost_bar)
 bar_group.append(vacuum_bar)
@@ -169,7 +166,7 @@ oil_temp_readout = label.Label(
     color=0x000000
 )
 oil_temp_readout.anchor_point = (1.0, 1.0)
-oil_temp_readout.anchored_position = (display_width - 27, display_height - 10)
+oil_temp_readout.anchored_position = (display_width - 34, display_height - 10)
 
 gauge_group.append(oil_temp_label)
 gauge_group.append(oil_temp_units)
@@ -181,20 +178,21 @@ screen.append(bar_group)
 screen.append(gauge_group)
 
 # --- testing ---
-# counting_up = True
+counting_up = True
 
 # update loop
 while True:
     # update boost readout value every 100ms
-    if (last_loop - start_boost_loop > 100):
+    if (last_loop - start_boost_loop > 50):
         # --- testing ---
-        # if (counting_up):
-        #     boost_pressure += .3
-        #     if (boost_pressure >= max_boost): counting_up = False
-        # else:
-        #     boost_pressure -= .3
-        #     if (boost_pressure <= max_boost * -1): counting_up = True
-        boost_pressure = boost_raw.value / 1000 - boost_offset
+        if (counting_up):
+            boost_pressure += .5
+            if (boost_pressure >= max_boost): counting_up = False
+        else:
+            boost_pressure -= .5
+            if (boost_pressure <= max_boost * -1): counting_up = True
+        # -- end testing --
+        # boost_pressure = boost_raw.value / 1000 - boost_offset
         boost_readout.text = str(f'{boost_pressure:5.1f}')
 
         if (boost_pressure > 0):
