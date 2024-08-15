@@ -57,6 +57,8 @@ oil_temp = getTempFromADC(thermistor.value)
 temp_samples_index = 0
 sample_size = 50
 oil_temp_samples = [oil_temp] * sample_size
+oil_temp_level_next = 0
+oil_temp_level_current = -1
 start_boost_loop = 0
 start_oil_loop = 0
 last_loop = 101
@@ -100,25 +102,40 @@ label_color = 0xff0303
 labels_x_pos = 1
 units_x_pos = display_width - 7
 bar_height = 70
-bar_palette = displayio.Palette(3)
-bar_palette[0] = 0x3040ff
-bar_palette[1] = 0xff0303
-bar_palette[2] = 0xdddddd
+bar_palette = displayio.Palette(16)
+bar_palette[0] = 0xdddddd
+bar_palette[1] = 0x00aaff
+bar_palette[2] = 0x00c8fa
+bar_palette[3] = 0x00e4fa
+bar_palette[4] = 0x00fae5
+bar_palette[5] = 0x00ff80
+bar_palette[6] = 0x03ff03
+bar_palette[7] = 0x55ff00
+bar_palette[8] = 0xb7ff00
+bar_palette[9] = 0xe1ff00
+bar_palette[10] = 0xffff00
+bar_palette[11] = 0xfff700
+bar_palette[12] = 0xffd500
+bar_palette[13] = 0xff9500
+bar_palette[14] = 0xff5500
+bar_palette[15] = 0xff0303
 
 
-# === build boost gauge ===
+#	=====================================================================
+#	[							boost gauge								]
+#	=====================================================================
 boost_readout_y_pos = display_height / 2 - 6
 
-boost_label = label.Label(sairaSmall, text="BOOST", color=label_color)
-boost_label.anchor_point = (0.0, 0.0)
-boost_label.anchored_position = (labels_x_pos, 5)
+# boost_label = label.Label(sairaSmall, text="BOOST", color=label_color)
+# boost_label.anchor_point = (0.0, 0.0)
+# boost_label.anchored_position = (labels_x_pos, 5)
 
 # boost_units = label.Label(sairaSmall, text="psi", color=0xffffff)
 # boost_units.anchor_point = (1.0, 1.0)
 # boost_units.anchored_position = (units_x_pos, boost_readout_y_pos)
 
 # create a list of polygons that we can toggle visibility of to simulate a filled arc for the boost and vacuum bars
-segments = 10
+boost_segments = 10
 radius = 135
 arc_width = 30
 origin = {
@@ -126,50 +143,27 @@ origin = {
 	'y': boost_readout_y_pos - 6
 }
 
-# points = []
-# start_angle = 45
-# spread_angle = 135
-# radius = radius + 2
-# arc_width = arc_width + 4
-# for i in range(segments * 2):
-# 	alpha = (i * spread_angle / (segments * 2) + start_angle) / 180 * math.pi
-# 	x = int(radius * math.cos(alpha))
-# 	y = -int(radius * math.sin(alpha))
-# 	points.append((x,y))
-
-# for i in range(segments * 2, -1, -1):
-# 	alpha = (i * spread_angle / (segments * 2) + start_angle) / 180 * math.pi
-# 	x = int((radius - arc_width) * math.cos(alpha))
-# 	y = -int((radius - arc_width) * math.sin(alpha))
-# 	points.append((x,y))
-
-# template_bar = vectorio.Polygon(
-# 	pixel_shader=bar_palette,
-# 	points=points,
-# 	x=int(origin['x']),
-# 	y=int(origin['y'])
-# )
-template_bar = Arc(
+boost_template_bar = Arc(
 	x=int(origin['x']),
 	y=int(origin['y']),
 	radius=radius + 2,
 	angle=135,
 	direction=45 + 67.5,
-	segments=segments * 2,
+	segments=boost_segments * 2,
 	arc_width=arc_width + 4,
 	fill=None,
-	outline=bar_palette[2]
+	outline=bar_palette[0]
 )
-bar_group.append(template_bar)
+bar_group.append(boost_template_bar)
 
-boost_bar = [None] * segments
+boost_bar = [None] * boost_segments
 start_angle = 45
 spread_angle = 90
-for i in range(segments):
-	reverse_index = segments - i - 1
+for i in range(boost_segments):
+	reverse_index = boost_segments - i - 1
 	points = [None] * 4
 	for j in range(2):
-		alpha = ((i+j) * spread_angle / segments + start_angle) / 180 * math.pi
+		alpha = ((i+j) * spread_angle / boost_segments + start_angle) / 180 * math.pi
 		x0 = int(radius * math.cos(alpha))
 		y0 = -int(radius * math.sin(alpha))
 		x1 = int((radius - arc_width) * math.cos(alpha))
@@ -186,15 +180,16 @@ for i in range(segments):
 
 	# reverse the order of the segments so it's more intuitive to make the bar appear to fill or empty
 	bar_group.append(boost_bar[reverse_index])
+	boost_bar[reverse_index].color_index = 1
 	boost_bar[reverse_index].hidden = True
 
-vacuum_bar = [None] * segments
+vacuum_bar = [None] * boost_segments
 start_angle = 135
 spread_angle = 45
-for i in range(segments):
+for i in range(boost_segments):
 	points = [None] * 4
 	for j in range(2):
-		alpha = ((i+j) * spread_angle / segments + start_angle) / 180 * math.pi
+		alpha = ((i+j) * spread_angle / boost_segments + start_angle) / 180 * math.pi
 		x0 = int(radius * math.cos(alpha))
 		y0 = -int(radius * math.sin(alpha))
 		x1 = int((radius - arc_width) * math.cos(alpha))
@@ -210,7 +205,7 @@ for i in range(segments):
 	)
 
 	bar_group.append(vacuum_bar[i])
-	vacuum_bar[i].color_index = 1
+	vacuum_bar[i].color_index = 15
 	vacuum_bar[i].hidden = True
 
 
@@ -230,35 +225,106 @@ boost_readout_minor = label.Label(
 boost_readout_minor.anchor_point = (0.0, 1.0)
 boost_readout_minor.anchored_position = (display_width - 64, boost_readout_y_pos - 3)
 
-# bar_group.append(template_bar)
-gauge_group.append(boost_label)
+# gauge_group.append(boost_label)
 # gauge_group.append(boost_units)
 gauge_group.append(boost_readout_major)
 gauge_group.append(boost_readout_minor)
 
 
-# === build oil temp gauge ===
-oil_temp_label = label.Label(sairaSmall, text="OIL TEMP", color=label_color)
-oil_temp_label.anchor_point = (0.0, 0.0)
-oil_temp_label.anchored_position = (labels_x_pos, display_height / 2 + 5)
+#	=====================================================================
+#	[							oil temp gauge							]
+#	=====================================================================
+# oil_temp_label = label.Label(sairaSmall, text="OIL TEMP", color=label_color)
+# oil_temp_label.anchor_point = (0.0, 0.0)
+# oil_temp_label.anchored_position = (labels_x_pos, display_height / 2 + 5)
 
 # since the startup temp is unknown, hide these units and the associated readout
 # on initial render by setting their color to 0x000000
 # the actual display color will be determined in the first iteration of the update loop below
-oil_temp_units = label.Label(sairaSmall, text="°F", color=0x000000)
-oil_temp_units.anchor_point = (1.0, 1.0)
-oil_temp_units.anchored_position = (units_x_pos, display_height - 10)
+# oil_temp_units = label.Label(sairaSmall, text="°F", color=0x000000)
+# oil_temp_units.anchor_point = (1.0, 1.0)
+# oil_temp_units.anchored_position = (units_x_pos, display_height - 10)
+
+oil_temp_segments = 20
+radius = 135
+arc_width = 30
+origin = {
+	'x': display_width - 100,
+	'y': display_height - 10
+}
+
+oil_temp_template_bar = Arc(
+	x=int(origin['x']),
+	y=int(origin['y']),
+	radius=radius + 2,
+	angle=135,
+	direction=45 + 67.5,
+	segments=oil_temp_segments,
+	arc_width=arc_width + 4,
+	fill=None,
+	outline=bar_palette[0]
+)
+bar_group.append(oil_temp_template_bar)
+
+oil_temp_bar = [None] * oil_temp_segments
+start_angle = 45
+spread_angle = 135
+for i in range(oil_temp_segments):
+	reverse_index = oil_temp_segments - i - 1
+	points = [None] * 4
+	for j in range(2):
+		alpha = ((i+j) * spread_angle / oil_temp_segments + start_angle) / 180 * math.pi
+		x0 = int(radius * math.cos(alpha))
+		y0 = -int(radius * math.sin(alpha))
+		x1 = int((radius - arc_width) * math.cos(alpha))
+		y1 = -int((radius - arc_width) * math.sin(alpha))
+		points[0 + j] = (x0,y0)
+		points[3 - j] = (x1,y1)
+
+	oil_temp_bar[reverse_index] = vectorio.Polygon(
+		pixel_shader=bar_palette,
+		points=points,
+		x=int(origin['x']),
+		y=int(origin['y'])
+	)
+
+	# reverse the order of the segments so it's more intuitive to make the bar appear to fill or empty
+	bar_group.append(oil_temp_bar[reverse_index])
+	oil_temp_bar[reverse_index].hidden = True
+
+# oil_temp_bar[0].hidden = False
+
+oil_temp_bar[0].color_index = 2
+oil_temp_bar[1].color_index = 3
+oil_temp_bar[2].color_index = 4
+oil_temp_bar[3].color_index = 5
+oil_temp_bar[4].color_index = 6
+oil_temp_bar[5].color_index = 6
+oil_temp_bar[6].color_index = 6
+oil_temp_bar[7].color_index = 6
+oil_temp_bar[8].color_index = 7
+oil_temp_bar[9].color_index = 8
+oil_temp_bar[10].color_index = 9
+oil_temp_bar[11].color_index = 10
+oil_temp_bar[12].color_index = 10
+oil_temp_bar[13].color_index = 10
+oil_temp_bar[14].color_index = 11
+oil_temp_bar[15].color_index = 12
+oil_temp_bar[16].color_index = 13
+oil_temp_bar[17].color_index = 14
+oil_temp_bar[18].color_index = 15
+oil_temp_bar[19].color_index = 15
 
 oil_temp_readout = label.Label(
 	saira,
 	text=str(int(oil_temp)),
-	color=0x000000
+	color=0xffffff
 )
 oil_temp_readout.anchor_point = (1.0, 1.0)
-oil_temp_readout.anchored_position = (display_width - 34, display_height - 10)
+oil_temp_readout.anchored_position = (display_width - 6, display_height - 10)
 
-gauge_group.append(oil_temp_label)
-gauge_group.append(oil_temp_units)
+# gauge_group.append(oil_temp_label)
+# gauge_group.append(oil_temp_units)
 gauge_group.append(oil_temp_readout)
 
 
@@ -268,28 +334,33 @@ screen.append(gauge_group)
 
 # --- testing ---
 # counting_up = True
+test_temp = 0
+# -- end testing --
 
-# update loop
+
+#	=====================================================================
+#	[							update loop								]
+#	=====================================================================
 while True:
-	# update boost readout value every 100ms
+	# update boost readout value every 10ms
 	if (last_loop - start_boost_loop > 10):
-		# --- testing ---
+# --- testing ---
 		# if (counting_up):
 		# 	boost_pressure += .6
 		# 	if (boost_pressure >= max_boost): counting_up = False
 		# else:
 		# 	boost_pressure -= .6
 		# 	if (boost_pressure <= max_boost * -1): counting_up = True
-		# -- end testing --
+# -- end testing --
 		boost_pressure = boost_raw.value / 1000 - boost_offset
-		boost_pressure_string_list = str(f'{boost_pressure:.1f}').split('.')
-		boost_readout_major.text = boost_pressure_string_list[0]
-		boost_readout_minor.text = '.' + boost_pressure_string_list[-1]
-		boost_segments_to_show = math.fabs(math.ceil((int(boost_pressure * 10) / int(max_boost * 10)) * segments))
-		if (boost_segments_to_show > segments):
-			boost_segments_to_show = segments
+		boost_pressure_split_string = str(f'{boost_pressure:.1f}').split('.')
+		boost_readout_major.text = boost_pressure_split_string[0]
+		boost_readout_minor.text = '.' + boost_pressure_split_string[-1]
+		boost_segments_to_show = math.fabs(math.ceil((int(boost_pressure * 10) / int(max_boost * 10)) * boost_segments))
+		if (boost_segments_to_show > boost_segments):
+			boost_segments_to_show = boost_segments
 
-		for i in range(segments):
+		for i in range(boost_segments):
 			boost_bar[i].hidden = True
 			vacuum_bar[i].hidden = True
 
@@ -309,30 +380,32 @@ while True:
 		start_boost_loop = supervisor.ticks_ms()
 
 	# calculating temp from the raw thermistor value is expensive, so only update every second
-	if (last_loop - start_oil_loop > 1000):
-		oil_temp = getTempFromADC(thermistor.value)
-		oil_temp_damped = '- - '
-		oil_temp_samples[temp_samples_index] = int(oil_temp)
-		temp_samples_index = (temp_samples_index + 1) % sample_size
+	if (last_loop - start_oil_loop > 500):
+		# oil_temp = getTempFromADC(thermistor.value)
+		# oil_temp_damped = '- - '
+		# oil_temp_samples[temp_samples_index] = int(oil_temp)
+		# temp_samples_index = (temp_samples_index + 1) % sample_size
 
-		if (oil_temp < 0):
-			update_color = 0xffffff
-		else:
-			oil_temp_damped = sum(oil_temp_samples) / len(oil_temp_samples)
-			oil_temp_damped = str(int(oil_temp_damped))
-			if (oil_temp < 200):
-				# blue
-				update_color = 0x3040ff
-			elif (oil_temp < 270):
-				# white
-				update_color = 0xffffff
-			else:
-				# red
-				update_color = 0xff2020
+		# if (oil_temp > 0):
+		# 	oil_temp_damped = sum(oil_temp_samples) / len(oil_temp_samples)
+		# 	oil_temp_damped = int(oil_temp_damped)
 
-		oil_temp_units.color = update_color
-		oil_temp_readout.color = update_color
-		oil_temp_readout.text = oil_temp_damped
+# --- testing ---
+		test_temp = ((test_temp + 5) % 120)
+		oil_temp_readout.text = str(test_temp + 175)
+		oil_temp_level_next = int((int(oil_temp_readout.text) - 180) / 6)
+# -- end testing --
+		# oil_temp_level_next = int((oil_temp_damped - 180) / 6)
+		# oil_temp_readout.text = str(oil_temp_damped)
+		if (oil_temp_level_next > oil_temp_level_current):
+			for i in range(oil_temp_level_current + 1, oil_temp_level_next + 1):
+				oil_temp_bar[i].hidden = False
+
+		elif (oil_temp_level_next < oil_temp_level_current):
+			for i in range(oil_temp_level_current, oil_temp_level_next, -1):
+				oil_temp_bar[i].hidden = True
+
+		oil_temp_level_current = oil_temp_level_next
 		start_oil_loop = supervisor.ticks_ms()
 
 	last_loop = supervisor.ticks_ms()
