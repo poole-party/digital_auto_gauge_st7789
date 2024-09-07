@@ -362,16 +362,16 @@ while True:
 	# check the encoder state and adjust data accordingly
 	current_position = encoder.position
 	if (current_position > last_position):
-		test_boost += 1
+		test_temp += 1
 	elif (current_position < last_position):
-		test_boost -= 1
+		test_temp -= 1
 
 	last_position = current_position
 
 	# update boost readout value every 10ms
 	if (last_loop - start_boost_loop > 10):
 # --- testing ---
-		# test_boost = ((test_boost + 1) % 251)
+		test_boost = ((test_boost + 1) % 251)
 		mdp_next = (test_boost - 150) / 10
 # -- end testing --
 		# mdp_next = boost_raw.value / 1000 - boost_offset
@@ -389,7 +389,6 @@ while True:
 			if (bar_level_next > bar_level_current or (boost_bar[0].hidden and mdp_next >= 0.1)):
 				for i in range(bar_level_current, bar_level_next + 1):
 					boost_bar[i].hidden = False
-
 			elif (bar_level_next < bar_level_current):
 				for i in range(bar_level_current, bar_level_next, -1):
 					boost_bar[i].hidden = True
@@ -404,7 +403,6 @@ while True:
 			if (bar_level_next > bar_level_current or (vacuum_bar[0].hidden and mdp_next <= -0.1)):
 				for i in range(bar_level_current, bar_level_next + 1):
 					vacuum_bar[i].hidden = False
-
 			elif (bar_level_next < bar_level_current):
 				for i in range(bar_level_current, bar_level_next, -1):
 					vacuum_bar[i].hidden = True
@@ -443,8 +441,8 @@ while True:
 		bar_level_current = bar_level_next
 		start_boost_loop = supervisor.ticks_ms()
 
-	# calculating temp from the raw thermistor value is expensive, so only update once a second
-	if (last_loop - start_oil_loop > 1000):
+	# calculating temp from the raw thermistor value is expensive, so only update twice a second
+	if (last_loop - start_oil_loop > 500):
 		oil_temp = getTempFromADC(thermistor.value)
 		oil_temp_damped = '- - '
 		oil_temp_samples[temp_samples_index] = int(oil_temp)
@@ -456,15 +454,22 @@ while True:
 
 # --- testing ---
 		test_temp = ((test_temp + 5) % 120)
-		oil_temp_readout.text = str(test_temp + 175)
-		oil_temp_level_next = int((test_temp) / 6)
+		oil_temp_damped = test_temp + 180
+		oil_temp_level_next = int(test_temp / ((max_oil_temp - 180) / (oil_temp_segments - 1)))
 # -- end testing --
-		# oil_temp_level_next = int((oil_temp_damped - 180) / (max_oil_temp / (oil_temp_segments - 1)))
-		# oil_temp_readout.text = str(oil_temp_damped)
-		if (oil_temp_level_next > oil_temp_level_current):
+		# oil_temp_level_next = int((oil_temp_damped - 180) / ((max_oil_temp - 180) / (oil_temp_segments - 1)))
+		oil_temp_readout.text = str(oil_temp_damped)
+		if (oil_temp_damped - 180) < 0:
+			# set the level to zero if temp is below 180 so we don't get an index out of range error
+			for i in range(oil_temp_segments):
+				oil_temp_bar[i].hidden = True
+			oil_temp_level_next = -1
+		elif oil_temp_level_next > oil_temp_segments - 1:
+			# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
+			oil_temp_level_next = oil_temp_segments - 1
+		elif (oil_temp_level_next > oil_temp_level_current):
 			for i in range(oil_temp_level_current + 1, oil_temp_level_next + 1):
 				oil_temp_bar[i].hidden = False
-
 		elif (oil_temp_level_next < oil_temp_level_current):
 			for i in range(oil_temp_level_current, oil_temp_level_next, -1):
 				oil_temp_bar[i].hidden = True
