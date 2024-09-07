@@ -1,7 +1,8 @@
-import busio
 import board
+import busio
 import displayio
 import math
+import rotaryio
 import supervisor
 import vectorio
 from adafruit_bitmap_font import  bitmap_font
@@ -45,7 +46,11 @@ tft_cs = board.GP13
 tft_dc = board.GP12
 tft_reset = board.GP9
 
-# init the measurement vars
+# init the rotary encoder and allocate pins
+encoder = rotaryio.IncrementalEncoder(board.GP0, board.GP1)
+last_position = 0
+
+# init the manifold pressure measurement vars
 boost_raw = AnalogIn(board.A0)
 # Need to figure out a different way to do this. Engine will be running and pulling vacuum before this can run.
 boost_offset = getBoostOffset(boost_raw)
@@ -55,8 +60,11 @@ max_vacuum = 15
 # manifold differential pressure (MDP): the difference between the pressure in the intake manifold and the ambient air pressure
 mdp_current = 0
 mdp_next = boost_raw.value / 1000 - boost_offset
-mdp_level_current = 0
-mdp_level_next = 0
+bar_level_current = 0
+bar_level_next = 0
+start_boost_loop = 0
+
+# init the oil temperature measurement vars
 thermistor = AnalogIn(board.A2)
 oil_temp = getTempFromADC(thermistor.value)
 max_oil_temp = 300
@@ -65,8 +73,8 @@ sample_size = 50
 oil_temp_samples = [oil_temp] * sample_size
 oil_temp_level_next = 0
 oil_temp_level_current = -1
-start_boost_loop = 0
 start_oil_loop = 0
+
 last_loop = 101
 
 # init the display and define the display context
@@ -341,8 +349,8 @@ screen.append(bar_group)
 screen.append(gauge_group)
 
 # --- testing ---
-# test_boost = 0
-# test_temp = 0
+test_boost = 0
+test_temp = 0
 print('\n')
 # -- end testing --
 
@@ -351,81 +359,88 @@ print('\n')
 #	[							update loop								]
 #	=====================================================================
 while True:
+	# check the encoder state and adjust data accordingly
+	current_position = encoder.position
+	if (current_position > last_position):
+		test_boost += 1
+	elif (current_position < last_position):
+		test_boost -= 1
+
+	last_position = current_position
+
 	# update boost readout value every 10ms
 	if (last_loop - start_boost_loop > 10):
 # --- testing ---
-		# test_boost = ((test_boost + 5) % 251)
-		# # test_boost = 150
-		# mdp_next = (test_boost - 150) / 10
+		# test_boost = ((test_boost + 1) % 251)
+		mdp_next = (test_boost - 150) / 10
 # -- end testing --
-		mdp_next = boost_raw.value / 1000 - boost_offset
+		# mdp_next = boost_raw.value / 1000 - boost_offset
 		mdp_split_string = str(f'{mdp_next:.1f}').split('.')
 		boost_readout_major.text = mdp_split_string[0]
 		boost_readout_minor.text = '.' + mdp_split_string[-1]
 
 		# change in boost only
-		if (mdp_current >= 0 and mdp_next >= 0):
-			mdp_level_next = int(mdp_next / (max_boost / (boost_segments - 1)))
+		if (mdp_current > 0 and mdp_next > 0):
+			bar_level_next = int(mdp_next / (max_boost / (boost_segments - 1)))
 			# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
-			if (mdp_level_next >= boost_segments):
-				mdp_level_next = boost_segments - 1
+			if (bar_level_next >= boost_segments):
+				bar_level_next = boost_segments - 1
 
-			if (mdp_level_next > mdp_level_current or (boost_bar[0].hidden and mdp_next >= 0.1)):
-				for i in range(mdp_level_current, mdp_level_next + 1):
+			if (bar_level_next > bar_level_current or (boost_bar[0].hidden and mdp_next >= 0.1)):
+				for i in range(bar_level_current, bar_level_next + 1):
 					boost_bar[i].hidden = False
 
-			elif (mdp_level_next < mdp_level_current):
-				for i in range(mdp_level_current, mdp_level_next - 1, -1):
+			elif (bar_level_next < bar_level_current):
+				for i in range(bar_level_current, bar_level_next, -1):
 					boost_bar[i].hidden = True
 
 		# change in vacuum only
 		elif (mdp_current < 0 and mdp_next < 0):
-			mdp_level_next = int(math.fabs(mdp_next) / (max_vacuum / (vacuum_segments - 1)))
+			bar_level_next = int(math.fabs(mdp_next) / (max_vacuum / (vacuum_segments - 1)))
 			# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
-			if (mdp_level_next >= vacuum_segments):
-				mdp_level_next = vacuum_segments - 1
+			if (bar_level_next >= vacuum_segments):
+				bar_level_next = vacuum_segments - 1
 
-			if (mdp_level_next > mdp_level_current or (vacuum_bar[0].hidden and mdp_next <= -0.1)):
-				print('\nlevel: ' + str(mdp_level_next))
-				for i in range(mdp_level_current, mdp_level_next + 1):
+			if (bar_level_next > bar_level_current or (vacuum_bar[0].hidden and mdp_next <= -0.1)):
+				for i in range(bar_level_current, bar_level_next + 1):
 					vacuum_bar[i].hidden = False
 
-			elif (mdp_level_next < mdp_level_current):
-				for i in range(mdp_level_current, mdp_level_next - 1, -1):
+			elif (bar_level_next < bar_level_current):
+				for i in range(bar_level_current, bar_level_next, -1):
 					vacuum_bar[i].hidden = True
 
 		# change from boost to vacuum
 		elif (mdp_current >= 0 and mdp_next < 0):
-			mdp_level_next = int(math.fabs(mdp_next) / (max_vacuum / (vacuum_segments - 1)))
+			bar_level_next = int(math.fabs(mdp_next) / (max_vacuum / (vacuum_segments - 1)))
 			# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
-			if (mdp_level_next >= vacuum_segments):
-				mdp_level_next = vacuum_segments - 1
+			if (bar_level_next >= vacuum_segments):
+				bar_level_next = vacuum_segments - 1
 
 			# empty the boost bar
-			for i in range(mdp_level_current, -1, -1):
+			for i in range(bar_level_current, -1, -1):
 				boost_bar[i].hidden = True
 
 			# fill the vacuum bar
-			for i in range(0, mdp_level_next + 1):
+			for i in range(0, bar_level_next + 1):
 				vacuum_bar[i].hidden = False
 
 		# change from vacuum to boost
 		elif (mdp_current < 0 and mdp_next >= 0):
-			mdp_level_next = int(mdp_next / (max_boost / (boost_segments - 1)))
+			bar_level_next = int(mdp_next / (max_boost / (boost_segments - 1)))
 			# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
-			if (mdp_level_next >= boost_segments):
-				mdp_level_next = boost_segments - 1
+			if (bar_level_next >= boost_segments):
+				bar_level_next = boost_segments - 1
 
 			# empty the vacuum bar
-			for i in range(mdp_level_current, -1, -1):
+			for i in range(bar_level_current, -1, -1):
 				vacuum_bar[i].hidden = True
 
 			# fill the boost bar
-			for i in range(0, mdp_level_next + 1):
+			for i in range(0, bar_level_next + 1):
 				boost_bar[i].hidden = False
 
 		mdp_current = mdp_next
-		mdp_level_current = mdp_level_next
+		bar_level_current = bar_level_next
 		start_boost_loop = supervisor.ticks_ms()
 
 	# calculating temp from the raw thermistor value is expensive, so only update once a second
@@ -440,12 +455,12 @@ while True:
 			oil_temp_damped = int(oil_temp_damped)
 
 # --- testing ---
-		# test_temp = ((test_temp + 5) % 120)
-		# oil_temp_readout.text = str(test_temp + 175)
-		# oil_temp_level_next = int((test_temp) / 6)
+		test_temp = ((test_temp + 5) % 120)
+		oil_temp_readout.text = str(test_temp + 175)
+		oil_temp_level_next = int((test_temp) / 6)
 # -- end testing --
-		oil_temp_level_next = int((oil_temp_damped - 180) / (max_oil_temp / (oil_temp_segments - 1)))
-		oil_temp_readout.text = str(oil_temp_damped)
+		# oil_temp_level_next = int((oil_temp_damped - 180) / (max_oil_temp / (oil_temp_segments - 1)))
+		# oil_temp_readout.text = str(oil_temp_damped)
 		if (oil_temp_level_next > oil_temp_level_current):
 			for i in range(oil_temp_level_current + 1, oil_temp_level_next + 1):
 				oil_temp_bar[i].hidden = False
