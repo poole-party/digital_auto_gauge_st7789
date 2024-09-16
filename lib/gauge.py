@@ -4,16 +4,18 @@ import vectorio
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.arc import Arc
 from adafruit_display_text import label
+from temperature import Temperature
 
-BOOST_OFFSET = 14
+BOOST_OFFSET = 13.88
 MAX_BOOST = 10
 MAX_VACUUM = 15
 READOUT_FONT_MAJOR = bitmap_font.load_font("fonts/saira-bold-italic-56pt.bdf")
 READOUT_FONT_MINOR = bitmap_font.load_font("fonts/saira-bold-italic-43pt-60.bdf")
 
 class Gauge:
-	def __init__(self, origin, radius, arc_width, angles, primary_segments, primary_color_index, secondary_segments, secondary_color_index, palette, readout_value, readout_pos, readout_minor):
-		gauge_group = displayio.Group()
+	def __init__(self, gauge_type, origin, radius, arc_width, angles, primary_segments, primary_color_index, palette, readout_major, readout_pos, secondary_segments = None, secondary_color_index = None, readout_minor = None):
+		self.gauge_type = gauge_type
+		self.group = displayio.Group()
 		self.primary_segments = primary_segments
 		template_segments = primary_segments
 		if secondary_segments:
@@ -32,7 +34,7 @@ class Gauge:
 			fill=None,
 			outline=palette[0]
 		)
-		gauge_group.append(self.template_bar)
+		self.group.append(self.template_bar)
 
 		# build and add the fill bar
 		self.gauge_bar = [None] * primary_segments
@@ -57,7 +59,7 @@ class Gauge:
 			# reverse the order of the segments so it's more intuitive to make the bar appear to fill or empty
 			self.gauge_bar[reverse_index].hidden = True
 			self.gauge_bar[reverse_index].color_index = primary_color_index
-			gauge_group.append(self.gauge_bar[reverse_index])
+			self.group.append(self.gauge_bar[reverse_index])
 
 		# if there is a secondary fill bar, build it and add it to the gauge group
 		if secondary_segments:
@@ -82,27 +84,26 @@ class Gauge:
 				)
 				self.gauge_bar_secondary[i].hidden = True
 				self.gauge_bar_secondary[i].color_index = secondary_color_index
-				gauge_group.append(self.gauge_bar_secondary[i])
+				self.group.append(self.gauge_bar_secondary[i])
 
 		# build and add the numeric readout
 		self.readout = label.Label(
 			READOUT_FONT_MAJOR,
-			text=str(int(readout_value)),
+			text=readout_major,
 			color=palette[16]
 		)
 		self.readout.anchor_point = (1.0, 1.0)
 		self.readout.anchored_position = (readout_pos['x'], readout_pos['y'])
-		gauge_group.append(self.readout)
+		self.group.append(self.readout)
 		if readout_minor:
 			self.readout_minor = label.Label(
 				READOUT_FONT_MINOR,
-				text='.' + str(f'{readout_value:0.1f}').split('.')[-1],
+				text=readout_minor,
 				color=palette[16]
 			)
 			self.readout_minor.anchor_point = (0.0, 1.0)
 			self.readout_minor.anchored_position = (readout_pos['x'], readout_pos['y'])
-			gauge_group.append(self.readout_minor)
-
+			self.group.append(self.readout_minor)
 
 	def get_template_bar(self):
 		return self.template_bar
@@ -110,10 +111,29 @@ class Gauge:
 	def get_gauge_bar(self):
 		return self.gauge_bar
 
-	def update_boost_gauge(self, value):
-		mdp_next = value / 1000 - BOOST_OFFSET
-		if not self.mdp_current:
+	def update_gauge(self, gauge_type, value, demo):
+		if gauge_type == 'boost':
+			self.update_boost(value, demo)
+		elif gauge_type == 'temperature':
+			self.update_temperature(value, demo)
+
+	def update_boost(self, value, demo=False):
+		if demo:
+			try:
+				mdp_next = (self.test_value - 150) / 10
+			except AttributeError:
+				self.test_value = 0
+				mdp_next = (self.test_value - 150) / 10
+
+			self.test_value = ((self.test_value + 2) % 251)
+		else:
+			mdp_next = value / 1000 - BOOST_OFFSET
+
+		if not hasattr(self, 'mdp_current'):
 			self.mdp_current = mdp_next
+
+		if not hasattr(self, 'bar_level_current'):
+			self.bar_level_current = 0
 
 		mdp_split_string = str(f'{mdp_next:.1f}').split('.')
 		self.readout.text = mdp_split_string[0]
@@ -178,16 +198,10 @@ class Gauge:
 				self.gauge_bar[i].hidden = False
 
 		self.mdp_current = mdp_next
-		self.bar_level_current = bar_level_next
+		try :
+			self.bar_level_current = bar_level_next
+		except NameError:
+			pass
 
-	def get_readout(self):
-		return self.readout
-
-	def update_readout(self, value):
-		self.readout.text = str(int(value))
-
-	def __str__(self):
-		return f'{self.name} {self.value}'
-
-	def __repr__(self):
-		return f'{self.name} {self.value}'
+	def update_temperature(self, value, demo=False):
+		pass
