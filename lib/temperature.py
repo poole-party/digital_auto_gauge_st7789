@@ -111,42 +111,27 @@ TEMP_LOOKUP = {
 }
 
 class Temperature:
-	def fahrenheit(self, value):
+	def lookup(self, value, units = 'c'):
+		if units == 'f':
+			units_key = 1
+		else:
+			units_key = 0
+
 		subset_key = int(str(value)[:2])
 		if subset_key < 32:
 			return 0
 
 		subset = TEMP_LOOKUP[subset_key]
-		last_key = None
-		for key in subset:
-			if key == value:
-				return subset[key][1]
+		last_value_key = None
+		for value_key in subset:
+			if value_key == value:
+				return subset[value_key][units_key]
 			else:
-				last_key = key
-				if key > value:
-					if (key - value) < math.fabs(value - key):
-						return subset[key][1]
+				last_value_key = value_key
+				if value_key > value:
+					if (value_key - value) < math.fabs(value - value_key):
+						return subset[value_key][units_key]
 					else:
-						return subset[last_key][1]
+						return subset[last_value_key][units_key]
 
-		return subset[last_key][1]
-
-	def celsius(self, value):
-		subset_key = int(str(value)[:2])
-		if subset_key < 32:
-			return 0
-
-		subset = TEMP_LOOKUP[subset_key]
-		last_key = None
-		for key in subset:
-			if key == value:
-				return subset[key][0]
-			else:
-				last_key = key
-				if key > value:
-					if (key - value) < math.fabs(value - key):
-						return subset[key][0]
-					else:
-						return subset[last_key][0]
-
-		return subset[last_key][0]
+		return subset[last_value_key][units_key]

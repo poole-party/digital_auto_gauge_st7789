@@ -9,11 +9,13 @@ from temperature import Temperature
 BOOST_OFFSET = 13.88
 MAX_BOOST = 10
 MAX_VACUUM = 15
+MAX_TEMP = 300
 READOUT_FONT_MAJOR = bitmap_font.load_font("fonts/saira-bold-italic-56pt.bdf")
 READOUT_FONT_MINOR = bitmap_font.load_font("fonts/saira-bold-italic-43pt-60.bdf")
+SAMPLE_SIZE = 50
 
 class Gauge:
-	def __init__(self, gauge_type, origin, radius, arc_width, angles, primary_segments, primary_color_index, palette, readout_major, readout_pos, secondary_segments = None, secondary_color_index = None, readout_minor = None):
+	def __init__(self, gauge_type, origin, radius, arc_width, angles, primary_segments, primary_color_index, palette, readout_pos, secondary = False, secondary_segments = None, secondary_color_index = None):
 		self.gauge_type = gauge_type
 		self.group = displayio.Group()
 		self.primary_segments = primary_segments
@@ -62,7 +64,7 @@ class Gauge:
 			self.group.append(self.gauge_bar[reverse_index])
 
 		# if there is a secondary fill bar, build it and add it to the gauge group
-		if secondary_segments:
+		if secondary:
 			self.gauge_bar_secondary = [None] * secondary_segments
 			for i in range(secondary_segments):
 				reverse_index = primary_segments + secondary_segments - i - 1
@@ -89,44 +91,40 @@ class Gauge:
 		# build and add the numeric readout
 		self.readout = label.Label(
 			READOUT_FONT_MAJOR,
-			text=readout_major,
+			text='0',
 			color=palette[16]
 		)
 		self.readout.anchor_point = (1.0, 1.0)
 		self.readout.anchored_position = (readout_pos['x'], readout_pos['y'])
 		self.group.append(self.readout)
-		if readout_minor:
+
+		if secondary:
 			self.readout_minor = label.Label(
 				READOUT_FONT_MINOR,
-				text=readout_minor,
+				text='.0',
 				color=palette[16]
 			)
 			self.readout_minor.anchor_point = (0.0, 1.0)
-			self.readout_minor.anchored_position = (readout_pos['x'], readout_pos['y'])
+			self.readout_minor.anchored_position = (readout_pos['x-minor'], readout_pos['y'])
 			self.group.append(self.readout_minor)
 
-	def get_template_bar(self):
-		return self.template_bar
+	def update_gauge(self, value, options = {}):
+		if self.gauge_type == 'boost':
+			self.update_boost(value, options)
+		elif self.gauge_type == 'temperature' or self.gauge_type == 'temp':
+			self.update_temperature(value, options)
 
-	def get_gauge_bar(self):
-		return self.gauge_bar
+	def update_boost(self, value, options = {}):
+		try:
+			if options['demo']:
+				try:
+					mdp_next = (self.test_value - 150) / 10
+				except AttributeError:
+					self.test_value = 0
+					mdp_next = (self.test_value - 150) / 10
 
-	def update_gauge(self, gauge_type, value, demo):
-		if gauge_type == 'boost':
-			self.update_boost(value, demo)
-		elif gauge_type == 'temperature':
-			self.update_temperature(value, demo)
-
-	def update_boost(self, value, demo=False):
-		if demo:
-			try:
-				mdp_next = (self.test_value - 150) / 10
-			except AttributeError:
-				self.test_value = 0
-				mdp_next = (self.test_value - 150) / 10
-
-			self.test_value = ((self.test_value + 2) % 251)
-		else:
+				self.test_value = ((self.test_value + 2) % 251)
+		except KeyError:
 			mdp_next = value / 1000 - BOOST_OFFSET
 
 		if not hasattr(self, 'mdp_current'):
@@ -203,5 +201,56 @@ class Gauge:
 		except NameError:
 			pass
 
-	def update_temperature(self, value, demo=False):
-		pass
+	def update_temperature(self, value, options):
+		try:
+			if options['demo']:
+				try:
+					self.test_value = (self.test_value + 2) % 150
+				except AttributeError:
+					self.test_value = 0
+
+				temp = self.test_value + 145
+		except KeyError:
+			temp = Temperature.lookup(value, options['units'])
+
+		# if not hasattr(self, 'samples_index'):
+		# 	self.samples_index = 0
+		# if not hasattr(self, 'samples'):
+		# 	self.samples = [temp] * SAMPLE_SIZE
+
+		display_temp = '- - '
+		# self.samples[self.samples_index] = int(temp)
+		# self.samples_index = (self.samples_index + 1) % SAMPLE_SIZE
+
+		if (temp > 0):
+			# display_temp = sum(self.samples) / len(self.samples)
+			# display_temp = int(display_temp)
+			display_temp = temp
+			temp_level_next = int((display_temp - 150) / ((MAX_TEMP - 150) / (self.primary_segments - 1)))
+			if not hasattr(self, 'temp_level_current'):
+				self.temp_level_current = -1
+
+		self.readout.text = str(display_temp)
+
+		# set the level to zero if temp is below 150 so we don't get an index out of range error
+		if not isinstance(display_temp, int) or display_temp - 150 < 0:
+			for i in range(self.primary_segments):
+				self.gauge_bar[i].hidden = True
+			temp_level_next = -1
+		# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
+		elif temp_level_next > self.primary_segments - 1:
+			temp_level_next = self.primary_segments - 1
+		elif (temp_level_next >= self.temp_level_current):
+			for i in range(self.temp_level_current + 1, temp_level_next + 1):
+				self.gauge_bar[i].hidden = False
+		elif (temp_level_next < self.temp_level_current):
+			for i in range(self.temp_level_current, temp_level_next, -1):
+				self.gauge_bar[i].hidden = True
+
+		self.temp_level_current = temp_level_next
+
+	def __str__(self):
+		return f'{self.name} {self.value}'
+
+	def __repr__(self):
+		return f'{self.name} {self.value}'
