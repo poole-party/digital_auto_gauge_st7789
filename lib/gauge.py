@@ -12,6 +12,7 @@ MAX_VACUUM = 15
 MAX_TEMP = 300
 READOUT_FONT_MAJOR = bitmap_font.load_font("fonts/saira-bold-italic-56pt.bdf")
 READOUT_FONT_MINOR = bitmap_font.load_font("fonts/saira-bold-italic-43pt-60.bdf")
+READOUT_FONT_MINI = bitmap_font.load_font("fonts/saira-semibold-20pt.bdf")
 SAMPLE_SIZE = 50
 
 class Gauge:
@@ -107,6 +108,22 @@ class Gauge:
 			self.readout_minor.anchor_point = (0.0, 1.0)
 			self.readout_minor.anchored_position = (readout_pos['x-minor'], readout_pos['y'])
 			self.group.append(self.readout_minor)
+
+		# build and add readout units
+		if self.gauge_type == 'boost':
+			units_text = 'PSI'
+		elif self.gauge_type == 'temperature' or self.gauge_type == 'temp':
+			units_text = '°F'
+
+		self.units = label.Label(
+			READOUT_FONT_MINI,
+			text=units_text,
+			color=palette[16]
+		)
+
+		self.units.anchor_point = (0.5, 1.0)
+		self.units.anchored_position = (readout_pos['x-units'], readout_pos['y-units'])
+		self.group.append(self.units)
 
 	def update_gauge(self, value, options = {}):
 		if self.gauge_type == 'boost':

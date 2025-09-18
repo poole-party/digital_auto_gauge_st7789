@@ -55,6 +55,7 @@ display = ST7789(
 	height = display_height,
 )
 
+display.rotation = 180
 display.root_group = screen
 
 color_bitmap = displayio.Bitmap(display_width, display_height, 1)
@@ -97,7 +98,7 @@ active_gauges.append(Gauge(
 	primary_segments = 20,
 	primary_color_index = 1,
 	palette = bar_palette,
-	readout_pos = { 'x': display_width - 60, 'y': display_height / 2 - 9, 'x-minor': display_width - 64 },
+	readout_pos = { 'x': display_width - 60, 'y': display_height / 2 - 9, 'x-minor': display_width - 64, 'x-units': display_width / 2 + 15, 'y-units': display_height / 2 - 80 },
 	secondary = True,
 	secondary_segments = 10,
 	secondary_color_index = 15,
@@ -118,7 +119,7 @@ active_gauges.append(Gauge(
 	primary_segments = 20,
 	primary_color_index = 1,
 	palette = bar_palette,
-	readout_pos = { 'x': display_width - 6, 'y': display_height - 10 },
+	readout_pos = { 'x': display_width - 6, 'y': display_height - 10, 'x-units': display_width / 2 + 15, 'y-units': display_height - 80 },
 ))
 
 # render gauges on display
