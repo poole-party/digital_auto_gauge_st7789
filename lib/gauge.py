@@ -3,6 +3,7 @@ import math
 import vectorio
 from adafruit_bitmap_font import bitmap_font
 from adafruit_display_shapes.arc import Arc
+from adafruit_display_shapes.roundrect import RoundRect
 from adafruit_display_text import label
 from temperature import Temperature
 
@@ -16,7 +17,7 @@ READOUT_FONT_MINI = bitmap_font.load_font("fonts/saira-semibold-20pt.bdf")
 SAMPLE_SIZE = 50
 
 class Gauge:
-	def __init__(self, gauge_type, origin, radius, arc_width, angles, primary_segments, primary_color_index, palette, readout_pos, secondary = False, secondary_segments = None, secondary_color_index = None):
+	def __init__(self, gauge_type, gauge_text, origin, radius, arc_width, angles, primary_segments, primary_color_index, palette, readout_pos, secondary = False, secondary_segments = None, secondary_color_index = None):
 		self.gauge_type = gauge_type
 		self.group = displayio.Group()
 		self.primary_segments = primary_segments
@@ -110,20 +111,27 @@ class Gauge:
 			self.group.append(self.readout_minor)
 
 		# build and add readout units
-		if self.gauge_type == 'boost':
-			units_text = 'PSI'
-		elif self.gauge_type == 'temperature' or self.gauge_type == 'temp':
-			units_text = '°F'
-
 		self.units = label.Label(
 			READOUT_FONT_MINI,
-			text=units_text,
+			text=gauge_text['units'],
 			color=palette[16]
 		)
 
 		self.units.anchor_point = (0.5, 1.0)
 		self.units.anchored_position = (readout_pos['x-units'], readout_pos['y-units'])
 		self.group.append(self.units)
+
+		# TODO: build and add gauge labels (or bitmap images?)
+		# self.icon_template = RoundRect(
+		# 	x=5,
+		# 	y=5,
+		# 	width=40,
+		# 	height=40,
+		# 	r=5,
+		# 	fill=0xffffff
+		# )
+
+		# self.group.append(self.icon_template)
 
 	def update_gauge(self, value, options = {}):
 		if self.gauge_type == 'boost':
@@ -263,6 +271,21 @@ class Gauge:
 		elif (temp_level_next < self.temp_level_current):
 			for i in range(self.temp_level_current, temp_level_next, -1):
 				self.gauge_bar[i].hidden = True
+
+		# update the bar color based on temperature
+		bar_color_index = 1
+
+		if (display_temp >= 300):
+			bar_color_index = 14
+		elif (display_temp >= 285):
+			bar_color_index = 13
+		elif (display_temp >= 270):
+			bar_color_index = 12
+		elif (display_temp >= 200):
+			bar_color_index = 6
+		
+		for i in range(self.primary_segments - 1, -1, -1):
+			self.gauge_bar[i].color_index = bar_color_index
 
 		self.temp_level_current = temp_level_next
 

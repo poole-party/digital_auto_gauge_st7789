@@ -64,23 +64,23 @@ color_bitmap = displayio.Bitmap(display_width, display_height, 1)
 # common vars shared by both gauges
 # sairaSmall = bitmap_font.load_font("fonts/saira-semibold-20pt.bdf")
 bar_palette = displayio.Palette(17)
-bar_palette[0] = 0xdddddd
-bar_palette[1] = 0x00aaff
-bar_palette[2] = 0x00c8fa
-bar_palette[3] = 0x00e4fa
-bar_palette[4] = 0x00fae5
-bar_palette[5] = 0x00ff80
-bar_palette[6] = 0x03ff03
-bar_palette[7] = 0x55ff00
-bar_palette[8] = 0xb7ff00
-bar_palette[9] = 0xe1ff00
-bar_palette[10] = 0xffff00
-bar_palette[11] = 0xfff700
-bar_palette[12] = 0xffd500
-bar_palette[13] = 0xff9500
-bar_palette[14] = 0xff5500
-bar_palette[15] = 0xff0303
-bar_palette[16] = 0xffffff
+bar_palette[0] = 0xdddddd	#light grey
+bar_palette[1] = 0x00aaff	#azure
+bar_palette[2] = 0x00c8fa	#turquoise 
+bar_palette[3] = 0x00e4fa	#cyan
+bar_palette[4] = 0x00fae5	#aqua
+bar_palette[5] = 0x00ff80	#spring green
+bar_palette[6] = 0x03ff03	#green
+bar_palette[7] = 0x55ff00	#bright green
+bar_palette[8] = 0xb7ff00	#lime
+bar_palette[9] = 0xe1ff00	#chartreuse
+bar_palette[10] = 0xffff00	#bright yellow
+bar_palette[11] = 0xfff700	#yellow
+bar_palette[12] = 0xffd500	#gold
+bar_palette[13] = 0xff9500	#orange
+bar_palette[14] = 0xff5500	#red orange
+bar_palette[15] = 0xff0303	#red
+bar_palette[16] = 0xffffff	#white
 
 active_gauges = []
 
@@ -91,6 +91,7 @@ active_gauges = []
 
 active_gauges.append(Gauge(
 	gauge_type = 'boost',
+	gauge_text = { 'description': 'BOOST', 'units': 'PSI' },
 	origin = { 'x': display_width - 100, 'y': display_height / 2 - 12 },
 	radius = 135,
 	arc_width = 30,
@@ -112,6 +113,7 @@ active_gauges.append(Gauge(
 
 active_gauges.append(Gauge(
 	gauge_type = 'temperature',
+	gauge_text = { 'description': 'OILTMP', 'units': '°F' },
 	origin = { 'x': display_width - 100, 'y': display_height - 10 },
 	radius = 135,
 	arc_width = 30,
