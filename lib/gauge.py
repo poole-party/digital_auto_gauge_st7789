@@ -227,6 +227,7 @@ class Gauge:
 			pass
 
 	def update_temperature(self, value, options):
+		print("Thermistor Value: ", value)
 		try:
 			if options['demo']:
 				try:
@@ -236,7 +237,7 @@ class Gauge:
 
 				temp = self.test_value + 145
 		except KeyError:
-			temp = Temperature.lookup(value, options['units'])
+			temp = Temperature.lookup(value,options['units'])
 
 		# if not hasattr(self, 'samples_index'):
 		# 	self.samples_index = 0
@@ -274,8 +275,11 @@ class Gauge:
 
 		# update the bar color based on temperature
 		bar_color_index = 1
+		print ("Display Temp: ", display_temp)
 
-		if (display_temp >= 300):
+		if (display_temp == '- - '):
+			bar_color_index = 14
+		elif (display_temp >= 300):
 			bar_color_index = 14
 		elif (display_temp >= 285):
 			bar_color_index = 13

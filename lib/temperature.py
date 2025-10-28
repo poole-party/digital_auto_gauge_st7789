@@ -111,14 +111,16 @@ TEMP_LOOKUP = {
 }
 
 class Temperature:
-	def lookup(self, value, units = 'c'):
+	def lookup(value, units = 'c'):
 		if units == 'f':
 			units_key = 1
 		else:
 			units_key = 0
 
+		print(value)
+		print(units)
 		subset_key = int(str(value)[:2])
-		if subset_key < 32:
+		if subset_key < 32 or len(str(value)) < 5:
 			return 0
 
 		subset = TEMP_LOOKUP[subset_key]

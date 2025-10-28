@@ -143,16 +143,17 @@ while True:
 	# last_position = current_position
 
 	options = {}
-	options['demo'] = True
-
+	options['units'] = 'f'
+	# options['demo'] = True
+	print("Boost Raw Value: ", boost_raw.value)
 	active_gauges[0].update_gauge(
-		value = 'boost_raw.value',
+		value = boost_raw.value,
 		options = options
 	)
 
 	# TODO: add units to options array and create defaults in gauge.py
 	active_gauges[1].update_gauge(
-		value = 'thermistor.value',
+		value = thermistor.value,
 		options = options
 	)
 
