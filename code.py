@@ -94,14 +94,14 @@ active_gauges.append(Gauge(
 	gauge_text = { 'description': 'BOOST', 'units': 'PSI' },
 	origin = { 'x': display_width - 100, 'y': display_height / 2 - 12 },
 	radius = 135,
-	arc_width = 30,
+	arc_width = 32,
 	angles = {'start': 45, 'spread': 90, 'secondary_spread': 45},
-	primary_segments = 20,
+	primary_segments = 6,
 	primary_color_index = 1,
 	palette = bar_palette,
 	readout_pos = { 'x': display_width - 60, 'y': display_height / 2 - 9, 'x-minor': display_width - 64, 'x-units': display_width / 2 + 15, 'y-units': display_height / 2 - 80 },
 	secondary = True,
-	secondary_segments = 10,
+	secondary_segments = 3,
 	secondary_color_index = 15,
 ))
 
@@ -116,9 +116,9 @@ active_gauges.append(Gauge(
 	gauge_text = { 'description': 'OILTMP', 'units': '°F' },
 	origin = { 'x': display_width - 100, 'y': display_height - 10 },
 	radius = 135,
-	arc_width = 30,
+	arc_width = 32,
 	angles = {'start': 45, 'spread': 135},
-	primary_segments = 20,
+	primary_segments = 10,
 	primary_color_index = 1,
 	palette = bar_palette,
 	readout_pos = { 'x': display_width - 6, 'y': display_height - 10, 'x-units': display_width / 2 + 15, 'y-units': display_height - 80 },
@@ -144,8 +144,8 @@ while True:
 
 	options = {}
 	options['units'] = 'f'
-	# options['demo'] = True
-	print("Boost Raw Value: ", boost_raw.value)
+	options['demo'] = True
+
 	active_gauges[0].update_gauge(
 		value = boost_raw.value,
 		options = options

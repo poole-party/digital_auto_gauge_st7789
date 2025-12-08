@@ -11,6 +11,10 @@ BOOST_OFFSET = 13.88
 MAX_BOOST = 10
 MAX_VACUUM = 15
 MAX_TEMP = 300
+MIN_TEMP = 180
+DANGER_TEMP_START = 285
+CAUTION_TEMP_START = 270
+OP_TEMP_START = 200
 READOUT_FONT_MAJOR = bitmap_font.load_font("fonts/saira-bold-italic-56pt.bdf")
 READOUT_FONT_MINOR = bitmap_font.load_font("fonts/saira-bold-italic-43pt-60.bdf")
 READOUT_FONT_MINI = bitmap_font.load_font("fonts/saira-semibold-20pt.bdf")
@@ -27,26 +31,34 @@ class Gauge:
 			template_segments += secondary_segments
 
 		# build and add the hollow bar template
-		self.template_bar = Arc(
-			x=int(origin['x']),
-			y=int(origin['y']),
-			radius=radius + 2,
-			angle=135,
-			direction=45 + 67.5,
-			segments=template_segments,
-			arc_width=arc_width + 4,
-			fill=None,
-			outline=palette[0]
-		)
-		self.group.append(self.template_bar)
+		# self.template_bar = Arc(
+		# 	x=int(origin['x']),
+		# 	y=int(origin['y']),
+		# 	radius=radius + 2,
+		# 	angle=135,
+		# 	direction=45 + 67.5,
+		# 	segments=template_segments,
+		# 	arc_width=arc_width + 4,
+		# 	fill=None,
+		# 	outline=palette[0]
+		# )
+		# self.group.append(self.template_bar)
 
 		# build and add the fill bar
 		self.gauge_bar = [None] * primary_segments
+		gap_ratio = 0.6  # Adjust this value to control gap size (0.9 = larger gap, 0.98 = smaller gap)
+
 		for i in range(primary_segments):
 			reverse_index = primary_segments - i - 1
 			points = [None] * 4
+
+			# Calculate the center position and width for this segment with gap
+			segment_angle_width = angles['spread'] / primary_segments
+			segment_center = i * segment_angle_width + segment_angle_width / 2
+			reduced_width = segment_angle_width * gap_ratio
+
 			for j in range(2):
-				alpha = ((i+j) * angles['spread'] / primary_segments + angles['start']) / 180 * math.pi
+				alpha = ((segment_center + (j - 0.5) * reduced_width) + angles['start']) / 180 * math.pi
 				x0 = int(radius * math.cos(alpha))
 				y0 = -int(radius * math.sin(alpha))
 				x1 = int((radius - arc_width) * math.cos(alpha))
@@ -63,16 +75,23 @@ class Gauge:
 			# reverse the order of the segments so it's more intuitive to make the bar appear to fill or empty
 			self.gauge_bar[reverse_index].hidden = True
 			self.gauge_bar[reverse_index].color_index = primary_color_index
+
 			self.group.append(self.gauge_bar[reverse_index])
 
 		# if there is a secondary fill bar, build it and add it to the gauge group
 		if secondary:
 			self.gauge_bar_secondary = [None] * secondary_segments
+
 			for i in range(secondary_segments):
 				reverse_index = primary_segments + secondary_segments - i - 1
 				points = [None] * 4
+
+				secondary_segment_angle_width = angles['secondary_spread'] / secondary_segments
+				secondary_segment_center = i * secondary_segment_angle_width + secondary_segment_angle_width / 2
+				secondary_reduced_width = secondary_segment_angle_width * gap_ratio
+
 				for j in range(2):
-					alpha = ((i+j) * angles['secondary_spread'] / secondary_segments + (angles['start'] + angles['spread'])) / 180 * math.pi
+					alpha = ((secondary_segment_center + (j - 0.5) * secondary_reduced_width) + (angles['start'] + angles['spread'])) / 180 * math.pi
 					x0 = int(radius * math.cos(alpha))
 					y0 = -int(radius * math.sin(alpha))
 					x1 = int((radius - arc_width) * math.cos(alpha))
@@ -231,13 +250,13 @@ class Gauge:
 		try:
 			if options['demo']:
 				try:
-					self.test_value = (self.test_value + 2) % 150
+					self.test_value = (self.test_value + 2) % MIN_TEMP
 				except AttributeError:
 					self.test_value = 0
 
 				temp = self.test_value + 145
 		except KeyError:
-			temp = Temperature.lookup(value,options['units'])
+			temp = Temperature.lookup(value, options['units'])
 
 		# if not hasattr(self, 'samples_index'):
 		# 	self.samples_index = 0
@@ -252,44 +271,37 @@ class Gauge:
 			# display_temp = sum(self.samples) / len(self.samples)
 			# display_temp = int(display_temp)
 			display_temp = temp
-			temp_level_next = int((display_temp - 150) / ((MAX_TEMP - 150) / (self.primary_segments - 1)))
+			temp_level_next = int((display_temp - MIN_TEMP) / ((MAX_TEMP - MIN_TEMP) / (self.primary_segments - 1)))
 			if not hasattr(self, 'temp_level_current'):
 				self.temp_level_current = -1
 
 		self.readout.text = str(display_temp)
 
-		# set the level to zero if temp is below 150 so we don't get an index out of range error
-		if not isinstance(display_temp, int) or display_temp - 150 < 0:
+		# set the level to zero if temp is below MIN_TEMP so we don't get an index out of range error
+		if not isinstance(display_temp, int) or display_temp - MIN_TEMP < 0:
 			for i in range(self.primary_segments):
-				self.gauge_bar[i].hidden = True
+				if (i == 0):
+					self.gauge_bar[i].hidden = False
+				else:
+					self.gauge_bar[i].hidden = True
 			temp_level_next = -1
 		# if the bar is maxed out, set the level to the last segment so we don't get an index out of range error
 		elif temp_level_next > self.primary_segments - 1:
 			temp_level_next = self.primary_segments - 1
 		elif (temp_level_next >= self.temp_level_current):
 			for i in range(self.temp_level_current + 1, temp_level_next + 1):
+				bar_temp_threshold = MIN_TEMP + ((MAX_TEMP - MIN_TEMP) / (self.primary_segments - 1) * i)
+				if (bar_temp_threshold >= DANGER_TEMP_START):
+					self.gauge_bar[i].color_index = 15
+				elif (bar_temp_threshold >= CAUTION_TEMP_START):
+					self.gauge_bar[i].color_index = 12
+				elif (bar_temp_threshold >= OP_TEMP_START):
+					self.gauge_bar[i].color_index = 6
+
 				self.gauge_bar[i].hidden = False
 		elif (temp_level_next < self.temp_level_current):
 			for i in range(self.temp_level_current, temp_level_next, -1):
 				self.gauge_bar[i].hidden = True
-
-		# update the bar color based on temperature
-		bar_color_index = 1
-		print ("Display Temp: ", display_temp)
-
-		if (display_temp == '- - '):
-			bar_color_index = 14
-		elif (display_temp >= 300):
-			bar_color_index = 14
-		elif (display_temp >= 285):
-			bar_color_index = 13
-		elif (display_temp >= 270):
-			bar_color_index = 12
-		elif (display_temp >= 200):
-			bar_color_index = 6
-		
-		for i in range(self.primary_segments - 1, -1, -1):
-			self.gauge_bar[i].color_index = bar_color_index
 
 		self.temp_level_current = temp_level_next
 
@@ -297,4 +309,4 @@ class Gauge:
 		return f'{self.name} {self.value}'
 
 	def __repr__(self):
-		return f'{self.name} {self.value}'
+		return f'{self.name} {self.value}' 
